@@ -77,6 +77,7 @@ local flySpeed = 60
 local moveConn, noclipConn
 local lv, ao
 
+
 -- WalkSpeed / Platform
 local platformEnabled = false
 local platformPart
@@ -86,6 +87,13 @@ local platformConn
 
 -- Tween
 local tweenNoclipConn
+
+-- Infinite Jump
+local infJumpEnabled = false
+local infJumpHolding = false
+local infJumpInputBeganConn
+local infJumpInputEndedConn
+local infJumpConn
 
 -- FOLLOW (BACKPACK)
 local followTarget = nil
@@ -203,7 +211,7 @@ end
 
 local espTabBtn = makeTabButton("ESP")
 local flyTabBtn = makeTabButton("FLY")
-local moveTabBtn = makeTabButton("MOVE")
+local moveTabBtn = makeTabButton("PLAYER")
 local tweenTabBtn = makeTabButton("TWEEN")
 local flingTabBtn = makeTabButton("FLING")
 local xrayTabBtn = makeTabButton("XRAY")
@@ -1364,6 +1372,41 @@ local function disablePlatform()
 	if platformPart then platformPart:Destroy() end
 end
 
+-- ================== INFINITE JUMP ==================
+local function enableInfJump()
+	if infJumpEnabled then return end
+	infJumpEnabled = true
+	infJumpHolding = false
+
+	infJumpInputBeganConn = UIS.InputBegan:Connect(function(input, gameProcessed)
+		if gameProcessed then return end
+		if input.KeyCode == Enum.KeyCode.Space then
+			infJumpHolding = true
+		end
+	end)
+
+	infJumpInputEndedConn = UIS.InputEnded:Connect(function(input)
+		if input.KeyCode == Enum.KeyCode.Space then
+			infJumpHolding = false
+		end
+	end)
+
+	infJumpConn = RunService.RenderStepped:Connect(function()
+		if infJumpHolding and humanoid then
+			humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		end
+	end)
+end
+
+local function disableInfJump()
+	if not infJumpEnabled then return end
+	infJumpEnabled = false
+	infJumpHolding = false
+	if infJumpInputBeganConn then infJumpInputBeganConn:Disconnect(); infJumpInputBeganConn = nil end
+	if infJumpInputEndedConn then infJumpInputEndedConn:Disconnect(); infJumpInputEndedConn = nil end
+	if infJumpConn then infJumpConn:Disconnect(); infJumpConn = nil end
+end
+
 local moveTop = Instance.new("Frame", moveFrame)
 moveTop.Size = UDim2.fromScale(0.9,0.2)
 moveTop.Position = UDim2.fromScale(0.05,0.05)
@@ -1461,10 +1504,34 @@ resetBtn.MouseButton1Click:Connect(function()
 	updateMoveInputs()
 end)
 
-local platformOnBtn = makeButton(moveFrame,"PLATFORM ON",0.6)
-local platformOffBtn = makeButton(moveFrame,"PLATFORM OFF",0.75)
-platformOnBtn.MouseButton1Click:Connect(enablePlatform)
-platformOffBtn.MouseButton1Click:Connect(disablePlatform)
+local platformBtn = makeButton(moveFrame,"PLATFORM: OFF",0.6)
+local function updatePlatformBtn()
+	platformBtn.Text = platformEnabled and "PLATFORM: ON" or "PLATFORM: OFF"
+end
+platformBtn.MouseButton1Click:Connect(function()
+	if platformEnabled then
+		disablePlatform()
+	else
+		enablePlatform()
+	end
+	updatePlatformBtn()
+end)
+updatePlatformBtn()
+
+local infJumpBtn = makeButton(moveFrame,"INF JUMP: OFF",0.75)
+infJumpBtn.Size = UDim2.fromScale(0.9,0.09)
+local function updateInfJumpBtn()
+	infJumpBtn.Text = infJumpEnabled and "INF JUMP: ON" or "INF JUMP: OFF"
+end
+infJumpBtn.MouseButton1Click:Connect(function()
+	if infJumpEnabled then
+		disableInfJump()
+	else
+		enableInfJump()
+	end
+	updateInfJumpBtn()
+end)
+updateInfJumpBtn()
 
 -- ================== TWEEN TO PLAYER ==================
 local function getChar()
