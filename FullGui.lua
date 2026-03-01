@@ -1672,8 +1672,21 @@ local function stopSpectating()
 	end
 end
 
+local function getSpectateSubject(plr)
+	if not plr then return nil end
+	local char = plr.Character
+	if not char then return nil end
+	local head = char:FindFirstChild("Head")
+	if head then return head end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if hrp then return hrp end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if hum then return hum end
+	return char:FindFirstChildWhichIsA("BasePart", true)
+end
+
 local function startSpectating(target)
-	if not target or not target.Character then return end
+	if not target then return end
 	if spectating then stopSpectating() end
 
 	specTarget = target
@@ -1694,21 +1707,6 @@ local function startSpectating(target)
 		specBG.Parent = hrp
 	end
 
-	-- Point camera at target and keep updating
-	specConn = RunService.RenderStepped:Connect(function()
-		if not specTarget or not specTarget.Character then
-			stopSpectating()
-			return
-		end
-		local targetHRP = specTarget.Character:FindFirstChild("HumanoidRootPart")
-		local targetHead = specTarget.Character:FindFirstChild("Head")
-		local subject = targetHead or targetHRP
-		if subject then
-			workspace.CurrentCamera.CameraSubject = subject
-			workspace.CurrentCamera.CameraType = Enum.CameraType.Follow
-		end
-	end)
-
 	specStatus.Text = "Spectating: " .. target.Name
 	specStatus.TextColor3 = C.greenText
 
@@ -1719,6 +1717,20 @@ local function startSpectating(target)
 	for _, data in pairs(specButtons) do
 		data.button.BackgroundColor3 = data.player == target and C.greenDark or C.entry
 	end
+
+	-- Point camera at target and keep updating (handles delayed character spawn)
+	specConn = RunService.RenderStepped:Connect(function()
+		if not specTarget then
+			stopSpectating()
+			return
+		end
+
+		local subject = getSpectateSubject(specTarget)
+		if subject then
+			workspace.CurrentCamera.CameraSubject = subject
+			workspace.CurrentCamera.CameraType = Enum.CameraType.Follow
+		end
+	end)
 end
 
 stopSpecBtn.MouseButton1Click:Connect(stopSpectating)
@@ -1739,6 +1751,7 @@ local function refreshSpecList()
 
 	for _, plr in ipairs(list) do
 		if plr ~= player then
+			local targetPlayer = plr
 			local b = Instance.new("TextButton", specScroll)
 			b.Size = UDim2.new(1, -10, 0, 40)
 			b.BackgroundColor3 = C.entry
@@ -1767,9 +1780,9 @@ local function refreshSpecList()
 			userLabel.TextScaled = true
 			userLabel.TextXAlignment = Enum.TextXAlignment.Left
 			userLabel.TextColor3 = C.textFaint
-			specButtons[plr.Name] = {button = b, player = plr}
+			specButtons[targetPlayer.Name] = {button = b, player = targetPlayer}
 			b.MouseButton1Click:Connect(function()
-				startSpectating(plr)
+				startSpectating(targetPlayer)
 			end)
 		end
 	end
